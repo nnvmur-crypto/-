@@ -1,0 +1,18 @@
+{
+  "name": "Осмотр Квартир Североморск",
+  "short_name": "Осмотр Кв",
+  "description": "Автономный чеклист дефектовки и ведомости объемов работ",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#007bff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1257/1257267.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

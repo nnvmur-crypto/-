@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Осмотр Квартир v15.3 PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background-color: #f4f6f9; color: #333; -webkit-user-select: none; user-select: none; }
+        .header { background: #007bff; color: white; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .actions-bar { display: flex; gap: 6px; margin-bottom: 10px; }
+        .btn { border: none; padding: 8px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; color: white; }
+        .btn-excel { background: #28a745; }
+        .btn-backup { background: #17a2b8; }
+        .btn-danger { background: #dc3545; }
+        .nav-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+        .tab-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; white-space: nowrap; font-size: 13px; color: #495057; }
+        .tab-btn.active { background: #007bff; color: white; border-color: #007bff; }
+        .apt-content { display: none; }
+        .apt-content.active { display: block; }
+        .card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #dee2e6; }
+        .apt-info { font-size: 12px; color: #6c757d; margin-bottom: 10px; background: #e9ecef; padding: 6px; border-radius: 4px; line-height: 1.4; }
+        .room-title { font-weight: bold; font-size: 13px; color: #495057; margin: 12px 0 6px 0; background: #e2e3e5; padding: 4px 6px; border-radius: 4px; border-left: 3px solid #6c757d; display: flex; justify-content: space-between; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+        label { font-size: 11px; color: #6c757d; display: block; margin-bottom: 2px; font-weight: 500; }
+        input, select, textarea { width: 100%; padding: 6px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; background: #fff; height: 32px; }
+        textarea { height: auto; }
+        .delta-badge { font-size: 11px; font-weight: bold; padding: 2px 4px; border-radius: 3px; display: inline-block; margin-top: 4px; }
+        .delta-zero { background: #e9ecef; color: #6c757d; }
+        .delta-pos { background: #d4edda; color: #155724; }
+        .delta-neg { background: #f8d7da; color: #721c24; }
+        .media-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+        .file-btn { position: relative; overflow: hidden; display: inline-block; background: #6c757d; color: white; padding: 6px 10px; font-size: 11px; border-radius: 4px; font-weight: bold; }
+        .file-btn input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .media-box { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; background: #f8f9fa; padding: 6px; border-radius: 4px; min-height: 40px; border: 1px dashed #dee2e6; }
+        .media-wrapper { position: relative; width: 60px; height: 60px; cursor: pointer; }
+        .media-preview { width: 100%; height: 100%; border-radius: 4px; object-fit: cover; border: 1px solid #ccc; box-sizing: border-box; }
+        .media-wrapper.selected .media-preview { border: 3px solid #dc3545; filter: brightness(0.8); }
+        .media-wrapper.selected::after { content: "✓"; position: absolute; top: 2px; right: 2px; background: #dc3545; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .checklist-v15 { background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; margin-top: 10px; padding: 8px; }
+        .checklist-header { font-weight: bold; font-size: 12px; color: #856404; margin-bottom: 6px; text-transform: uppercase; }
+        .check-row { display: flex; align-items: center; background: white; padding: 6px; margin-bottom: 4px; border-radius: 4px; border-left: 3px solid #ffc107; }
+        .check-row.mandatory { border-left-color: #dc3545; background: #fff5f5; }
+        .check-text { flex: 1; font-size: 11px; line-height: 1.3; }
+        .status-select { padding: 2px; font-size: 11px; font-weight: bold; width: auto; height: 26px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span>⚓ Североморск Осмотр v15.3</span>
+        <span>24.10.2026</span>
+    </div>
+
+    <div class="actions-bar">
+        <button class="btn btn-excel" onclick="exportSpreadsheetML()">📊 Excel</button>
+        <button class="btn btn-backup" onclick="exportTextDataBackup()">💾 Бэкап</button>
+        <button class="btn btn-danger" onclick="clearAllData()">🗑 Очистить Всё</button>
+    </div>
+
+    <div class="nav-tabs" id="tabs-container">
+        <button class="tab-btn active" onclick="switchApt('41')">Кв. 41</button>
+        <button class="tab-btn" onclick="switchApt('29')">Кв. 29</button>
+        <button class="tab-btn" onclick="switchApt('61')">Кв. 61</button>
+        <button class="tab-btn" onclick="switchApt('108')">Кв. 108</button>
+        <button class="tab-btn" onclick="switchApt('34')">Кв. 34</button>
+    </div>
+
+    <div id="apartments-container"></div>
+
+    <script>
+        const apts = {
+            "41": { addr: "ул. Падорина, 29, пом. 41, эт. 2", h: "2.70 м", rooms: [
+                {id:"liv", name:"Жилая комната", p:"17.54", f:"ламинат"},
+                {id:"hal", name:"Прихожая (Обязательно)", p:"8.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"9.10", f:"линолеум"},
+                {id:"bath", name:"Ванная (Обязательно)", p:"6.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ]},
+            "29": { addr: "ул. Сизова, 20, кв. 29, эт. 5", h: "2.70 м", rooms: [
+                {id:"liv1", name:"Жилая 1", p:"14.30", f:"ламинат"},
+                {id:"liv2", name:"Жилая 2", p:"11.10", f:"ламинат"},
+                {id:"hal", name:"Прихожая (Обязательно)", p:"8.00", f:"линолеум"},
+                {id:"cor", name:"Коридор", p:"1.80", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"9.42", f:"линолеум"},
+                {id:"pant", name:"Кладовая", p:"2.40", f:"—"},
+                {id:"bath", name:"Ванная", p:"6.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ]},
+            "61": { addr: "ул. Чабаненко, 5, кв. 61, эт. 7", h: "2.70 м", rooms: [
+                {id:"liv", name:"Жилая комната", p:"16.70", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"5.80", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"8.06", f:"линолеум"},
+                {id:"pant", name:"Кладовая", p:"1.70", f:"—"},
+                {id:"bath", name:"Ванная", p:"2.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"3.20", f:"—"}
+            ]},
+            "108": { addr: "ул. Падорина, 33, кв. 108, эт. 5", h: "2.70 м", rooms: [
+                {id:"liv", name:"Жилая Г-обр. (Обязательно)", p:"22.50", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"10.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"6.22", f:"линолеум"},
+                {id:"pant", name:"Кладовая", p:"1.30", f:"—"},
+                {id:"bath", name:"Ванная", p:"2.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ]},
+            "34": { addr: "ул. Сизова, 11, кв. 34, эт. 9", h: "2.65 м", rooms: [
+                {id:"liv", name:"Жилая (скош. угол)", p:"18.30", f:"ламинат"},
+                {id:"cor", name:"Коридор (роль прихожей)", p:"4.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"5.80", f:"линолеум"},
+                {id:"bath", name:"Ванная", p:"2.60", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ]}
+        };
+
+        let db;
+        const dbReq = indexedDB.open("okv_stable_v15", 1);
+        dbReq.onupgradeneeded = e => {
+            e.target.result.createObjectStore("files", {keyPath: "key"});
+        };
+        dbReq.onsuccess = e => { db = e.target.result; renderApp(); };
+
+        function renderApp() {
+            const container = document.getElementById("apartments-container");
+            container.innerHTML = "";
+            
+            Object.keys(apts).forEach((num, index) => {
+                const data = apts[num];
+                const activeClass = index === 0 ? "active" : "";
+                
+                let html = `<div class="apt-content ${activeClass}" id="content-${num}">
+                    <div class="card">
+                        <div style="font-weight:bold;font-size:15px;color:#007bff;">Квартира № ${num}</div>
+                        <div class="apt-info">📍 ${data.addr}<br>📏 Потолок БТИ: ${data.h}</div>`;
+                
+                data.rooms.forEach(r => {
+                    html += `<div class="room-title">
+                        <span>${r.name}</span>
+                        <span id="badge-${num}-${r.id}" class="delta-badge delta-zero">Δ 0.00</span>
+                    </div>
+                    <div class="grid-inputs">
+                        <div>
+                            <label>Периметр факт (план: ${r.p})</label>
+                            <input type="number" step="0.01" id="f-${num}-${r.id}-p" placeholder="0.00" oninput="updateDelta('${num}','${r.id}','${r.p}',this.value)">
+                        </div>
+                        <div>
+                            <label>Покрытие пола</label>
+                            <select id="f-${num}-${r.id}-floor" onchange="saveText(this.id, this.value)">
+                                <option value="${r.f}">${r.f}</option>
+                                <option value="ламинат">ламинат</option>
+                                <option value="линолеум">линолеум</option>
+                                <option value="плитка">плитка</option>
+                                <option value="—">—</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="media-controls">
+                        <div class="file-btn">
+                            📷 Выбрать Фото (Множественно)
+                            <input type="file" accept="image/*" multiple onchange="processPhotos(this, '${num}', '${r.id}')">
+                        </div>
+                        <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="deleteSelectedPhotos('${num}','${r.id}')">🗑 Удалить выбранные</button>
+                    </div>
+                    <div class="media-box" id="box-${num}-${r.id}"></div>`;
+                });
+
+                html += `<div class="checklist-v15">
+                    <div class="checklist-header">📋 Контроль критических дефектов</div>
+                    <div class="check-row mandatory">
+                        <div class="check-text"><strong>Б.6/Б.8</strong> Фактический замер прихожей и ванной выполнен обязательно?</div>
+                        <select id="ch-${num}-b6" class="status-select" onchange="saveText(this.id, this.value)">
+                            <option value="">Не проверено</option>
+                            <option value="Выполнено">✓ Выполнено</option>
+                            <option value="Пропущено">✗ Пропущено</option>
+                        </select>
+                    </div>
+                    <div class="check-row">
+                        <div class="check-text"><strong>А.3</strong> Тип кухонной плиты и наличие приборов учета газа</div>
+                        <select id="ch-${num}-a3" class="status-select" onchange="saveText(this.id, this.value)">
+                            <option value="">Не выбрано</option>
+                            <option value="Электроплита">Электроплита</option>
+                            <option value="Газовая плита + счетчик">Газовая плита + счетчик</option>
+                        </select>
+                    </div>
+                    <div class="check-row">
+                        <div class="check-text"><strong>Д.28</strong> Выявлен локальный нагар/копоть на поверхностях стен/потолков?</div>
+                        <select id="ch-${num}-d28" class="status-select" onchange="saveText(this.id, this.value)">
+                            <option value="">Нет нагара</option>
+                            <option value="Чистые стены">✓ Чистые стены</option>
+                            <option value="Требуется протравка">✗ Требуется протравка</option>
+                        </select>
+                    </div>
+                    <textarea placeholder="Фактические размеры окон, проемов, дефекты лаг, примечания..." id="notes-${num}" oninput="saveText(this.id, this.value)" style="margin-top:6px;height:45px;font-size:12px;"></textarea>
+                </div></div></div>`;
+                
+                container.innerHTML += html;
+            });
+            restoreTextFields();
+            loadBlobsPreviews();
+        }
+
+        function switchApt(num) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.apt-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`content-${num}`).classList.add('active');
+        }
+
+        function saveText(id, val) { localStorage.setItem(id, val); }
+
+        function updateDelta(num, roomId, plan, fact) {
+            saveText(`f-${num}-${roomId}-p`, fact);
+            const badge = document.getElementById(`badge-${num}-${roomId}`);
+            if(!badge) return;
+            
+            if(!fact || isNaN(fact)) {
+                badge.innerText = "Δ 0.00";
+                badge.className = "delta-badge delta-zero";
+                return;
+            }
+            
+            const diff = (parseFloat(fact) - parseFloat(plan)).toFixed(2);
+            if(parseFloat(diff) === 0) {
+                badge.innerText = `Δ 0.00`;
+                badge.className = "delta-badge delta-zero";
+            } else if (parseFloat(diff) > 0) {
+                badge.innerText = `Δ +${diff}`;
+                badge.className = "delta-badge delta-pos";
+            } else {
+                badge.innerText = `Δ ${diff}`;
+                badge.className = "delta-badge delta-neg";
+            }
+        }
+
+        function restoreTextFields() {
+            document.querySelectorAll('input, select, textarea').forEach(el => {
+                const v = localStorage.getItem(el.id);
+                if (v !== null) {
+                    el.value = v;
+                    if(el.id.endsWith('-p')) {
+                        const parts = el.id.split('-');
+                        const num = parts[1], rid = parts[2];
+                        const plan = apts[num].rooms.find(r=>r.id===rid).p;
+                        updateDelta(num, rid, plan, v);
+                    }
+                }
+            });
+        }
+
+        // Поддержка множественного выбора и пакетной Canvas-обработки фото
+        function processPhotos(input, num, roomId) {
+            if(!input.files) return;
+            const files = Array.from(input.files);
+            
+            files.forEach((file, i) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if(w > 1600) { h = Math.round((h * 1600) / w); w = 1600; }
+                        canvas.width = w; canvas.height = h;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        ctx.fillStyle = "rgba(255, 204, 0, 0.9)";
+                        ctx.font = "bold 30px sans-serif";
+                        const time = new Date().toLocaleString('ru-RU');
+                        ctx.fillText(`Кв.${num} · ${roomId} · ${time}`, 20, h - 25);
+                        
+                        canvas.toBlob(blob => {
+                            const key = `img-${num}-${roomId}-${Date.now()}-${i}`;
+                            const tx = db.transaction("files", "readwrite");
+                            tx.objectStore("files").put({ key, data: blob });
+                            if(i === files.length - 1) {
+                                tx.oncomplete = () => loadBlobsPreviews();
+                            }
+                        }, 'image/jpeg', 0.85);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadBlobsPreviews() {
+            if(!db) return;
+            document.querySelectorAll('.media-box').forEach(box => box.innerHTML = "");
+            
+            db.transaction("files", "readonly").objectStore("files").openCursor().onsuccess = e => {
+                const cursor = e.target.result;
+                if(cursor) {
+                    const k = cursor.value.key;
+                    const parts = k.split('-');
+                    const num = parts[1], rid = parts[2];
+                    const targetBox = document.getElementById(`box-${num}-${rid}`);
+                    
+                    if(targetBox) {
+                        const wrap = document.createElement('div');
+                        wrap.className = 'media-wrapper';
+                        wrap.dataset.key = k;
+                        wrap.onclick = () => wrap.classList.toggle('selected');
+                        
+                        const img = document.createElement('img');
+                        img.className = 'media-preview';
+                        img.src = URL.createObjectURL(cursor.value.data);
+                        
+                        wrap.appendChild(img);
+                        targetBox.appendChild(wrap);
+                    }
+                    cursor.continue();
+                }
+            };
+        }
+
+        function deleteSelectedPhotos(num, roomId) {
+            const box = document.getElementById(`box-${num}-${roomId}`);
+            if(!box) return;
+            const selected = box.querySelectorAll('.media-wrapper.selected');
+            if(selected.length === 0) { alert("Сначала тапните по фото для выделения красной рамкой!"); return; }
+            
+            if(confirm(`Удалить выбранные фотографии (${selected.length} шт.)?`)) {
+                const tx = db.transaction("files", "readwrite");
+                const store = tx.objectStore("files");
+                selected.forEach(w => store.delete(w.dataset.key));
+                tx.oncomplete = () => loadBlobsPreviews();
+            }
+        }
+
+        function clearAllData() {
+            if(confirm("⚠ Вы уверены, что хотите полностью стереть все заполненные замеры, чеклисты и фотографии? Это действие необратимо.")) {
+                localStorage.clear();
+                const tx = db.transaction("files", "readwrite");
+                tx.objectStore("files").clear();
+                tx.oncomplete = () => { alert("Хранилище очищено!"); renderApp(); };
+            }
+        }
+
+        function exportTextDataBackup() {
+            try {
+                const backup = { version: "v15.3-text", date: new Date().toISOString(), data: JSON.stringify(localStorage) };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `OKV_TEXT_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(link); link.click(); link.remove();
+            } catch (err) { alert("Ошибка бэкапа: " + err.message); }
+        }
+
+        // Сложная выгрузка в SpreadsheetML (Excel) с дельтами, подсветкой и именами фото
+        async function exportSpreadsheetML() {
+            // Собираем все ключи медиафайлов из IndexedDB
+            const mediaKeys = [];
+            await new Promise(resolve => {
+                db.transaction("files", "readonly").objectStore("files").getAllKeys().onsuccess = e => {
+                    mediaKeys.push(...e.target.result);
+                    resolve();
+                };
+            });
+
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:x="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Arial" x:CharSet="204" ss:Size="11"/></Style>
+  <Style ss:ID="Header"><Font ss:FontName="Arial" ss:Size="12" ss:Bold="1"/><Interior ss:Color="#DDE8F5" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Title"><Font ss:FontName="Arial" ss:Size="14" ss:Bold="1"/></Style>
+  <Style ss:ID="Meta"><Font ss:FontName="Arial" ss:Size="10" ss:Italic="1"/><Interior ss:Color="#F2F4F7" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="DeltaZero"><Font ss:FontName="Arial" ss:Color="#6C757D"/></Style>
+  <Style ss:ID="DeltaPos"><Font ss:FontName="Arial" ss:Bold="1" ss:Color="#155724"/><Interior ss:Color="#D4EDDA" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="DeltaNeg"><Font ss:FontName="Arial" ss:Bold="1" ss:Color="#721C24"/><Interior ss:Color="#F8D7DA" ss:Pattern="Solid"/></Style>
+ </Styles>`;
+
+            Object.keys(apts).forEach(num => {
+                const data = apts[num];
+                xml += `<Worksheet ss:Name="Кв. ${num} осмотр">
+   <Table ss:ExpandedColumnCount="7">
+    <Row>
+     <Cell ss:StyleID="Title"><Data ss:Type="String">Ведомость осмотра квартиры № ${num}</Data></Cell>
+    </Row>
+    <Row>
+     <Cell ss:StyleID="Meta"><Data ss:Type="String">Адрес: ${data.addr} | Высота потолка: ${data.h}</Data></Cell>
+    </Row>
+    <Row/>
+    <Row ss:StyleID="Header">
+     <Cell><Data ss:Type="String">Помещение</Data></Cell>
+     <Cell><Data ss:Type="String">Параметр</Data></Cell>
+     <Cell><Data ss:Type="String">План БТИ</Data></Cell>
+     <Cell><Data ss:Type="String">Факт строителя</Data></Cell>
+     <Cell><Data ss:Type="String">Отклонение (Дельта)</Data></Cell>
+     <Cell><Data ss:Type="String">Покрытие пола</Data></Cell>
+     <Cell><Data ss:Type="String">Имена фото/медиа</Data></Cell>
+    </Row>`;
+
+                data.rooms.forEach(r => {
+                    const factVal = localStorage.getItem(`f-${num}-${r.id}-p`) || "";
+                    const floorVal = localStorage.getItem(`f-${num}-${r.id}-floor`) || r.f;
+                    
+                    let delta = "0.00";
+                    let style = "DeltaZero";
+                    if(factVal && !isNaN(factVal)) {
+                        const diff = (parseFloat(factVal) - parseFloat(r.p)).toFixed(2);
+                        if(parseFloat(diff) > 0) { delta = `+${diff}`; style = "DeltaPos"; }
+                        else if(parseFloat(diff) < 0) { delta = diff; style = "DeltaNeg"; }
+                    } else {
+                        delta = "—";
+                    }
+
+                    // Собираем точные имена файлов
+                    const photos = mediaKeys.filter(k => k.startsWith(`img-${num}-${r.id}-`)).map(k => `${k}.jpg`);
+                    const photoStr = photos.length > 0 ? photos.join(", ") : "нет фото";
+
+                    xml += `<Row>
+     <Cell><Data ss:Type="String">${r.name}</Data></Cell>
+     <Cell><Data ss:Type="String">Периметр</Data></Cell>
+     <Cell><Data ss:Type="Number">${r.p}</Data></Cell>
+     <Cell><Data ss:Type="${factVal ? 'Number' : 'String'}">${factVal || "—"}</Data></Cell>
+     <Cell ss:StyleID="${style}"><Data ss:Type="String">${delta}</Data></Cell>
+     <Cell><Data ss:Type="String">${floorVal}</Data></Cell>
+     <Cell><Data ss:Type="String">${photoStr}</Data></Cell>
+    </Row>`;
+                });
+
+                // Подгружаем чек-листы в этот же лист Excel снизу
+                const chB6 = localStorage.getItem(`ch-${num}-b6`) || "Не проверено";
+                const chA3 = localStorage.getItem(`ch-${num}-a3`) || "Не выбрано";
+                const chD28 = localStorage.getItem(`ch-${num}-d28`) || "Нет нагара";
+                const notes = localStorage.getItem(`notes-${num}`) || "";
+
+                xml += `<Row/>
+    <Row><Cell ss:StyleID="Header"><Data ss:Type="String">Чек-лист контроля и примечания</Data></Cell></Row>
+    <Row><Cell><Data ss:Type="String">Б.6/Б.8 Замер прихожей и ванной:</Data></Cell><Cell><Data ss:Type="String">${chB6}</Data></Cell></Row>
+    <Row><Cell><Data ss:Type="String">А.3 Тип кухонной плиты:</Data></Cell><Cell><Data ss:Type="String">${chA3}</Data></Cell></Row>
+    <Row><Cell><Data ss:Type="String">Д.28 Наличие нагара/копоти:</Data></Cell><Cell><Data ss:Type="String">${chD28}</Data></Cell></Row>
+    <Row><Cell><Data ss:Type="String">Примечания дефектовщика:</Data></Cell><Cell ss:MergeAcross="5"><Data ss:Type="String">${notes}</Data></Cell></Row>
+   </Table>
+  </Worksheet>`;
+            });
+
+            xml += `</Workbook>`;
+            
+            const blob = new Blob([xml], {type: "application/vnd.ms-excel;charset=utf-8"});
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `VOR_Осмотр_Североморск_${new Date().toISOString().slice(0,10)}.xls`;
+            document.body.appendChild(link); link.click(); link.remove();
+        }
+    </script>
+</body>
+</html>
