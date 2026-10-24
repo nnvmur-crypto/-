@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Осмотр Квартир v15.6 PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background-color: #f4f6f9; color: #333; }
+        .header { background: #007bff; color: white; padding: 12px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-group { display: flex; gap: 6px; }
+        .btn { color: white; border: none; padding: 8px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-success { background: #28a745; }
+        .btn-info { background: #17a2b8; }
+        .btn-danger { background: #dc3545; }
+        .nav-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+        .tab-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; white-space: nowrap; font-size: 13px; }
+        .tab-btn.active { background: #007bff; color: white; border-color: #007bff; }
+        .apt-content { display: none; }
+        .apt-content.active { display: block; }
+        .card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #dee2e6; }
+        .apt-info { font-size: 12px; color: #6c757d; margin-bottom: 10px; background: #e9ecef; padding: 6px; border-radius: 4px; line-height: 1.4; }
+        .room-block { background: #fafafa; border: 1px solid #e9ecef; border-radius: 5px; padding: 8px; margin-bottom: 8px; }
+        .room-title { font-weight: bold; font-size: 13px; color: #495057; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+        label { font-size: 11px; color: #6c757d; display: block; margin-bottom: 2px; font-weight: 500; }
+        .delta-indicator { font-size: 11px; font-weight: bold; margin-top: 2px; display: block; }
+        .delta-zero { color: #6c757d; }
+        .delta-plus { color: #28a745; }
+        .delta-minus { color: #dc3545; }
+        input, select, textarea { width: 100%; padding: 6px; font-size: 13px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; background: #fff; }
+        .checklist-v15 { background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; margin-top: 10px; padding: 8px; }
+        .checklist-header { font-weight: bold; font-size: 12px; color: #856404; margin-bottom: 4px; text-transform: uppercase; display: flex; justify-content: space-between; }
+        .check-scroll-box { max-height: 280px; overflow-y: auto; margin-top: 6px; padding-right: 2px; }
+        .check-row { display: flex; align-items: center; background: white; padding: 6px; margin-bottom: 4px; border-radius: 4px; border-left: 3px solid #ffc107; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .check-row.mandatory { border-left-color: #dc3545; background: #fff5f5; }
+        .check-text { flex: 1; font-size: 11px; line-height: 1.3; padding-right: 6px; }
+        .status-select { padding: 2px; font-size: 11px; font-weight: bold; width: auto; height: 24px; }
+        .media-container { margin-top: 6px; border-top: 1px solid #eee; padding-top: 6px; }
+        .media-box { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; min-height: 10px; }
+        .media-item { position: relative; width: 60px; height: 60px; cursor: pointer; }
+        .media-preview { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        .media-item.selected .media-preview { border: 3px solid #dc3545; }
+        .file-btn { position: relative; overflow: hidden; display: inline-block; background: #6c757d; color: white; padding: 6px 10px; font-size: 11px; border-radius: 4px; font-weight: bold; }
+        .file-btn input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+        .media-actions { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span>⚓ Североморск v15.6</span>
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="exportToExcel()">📊 Excel</button>
+            <button class="btn btn-info" onclick="exportTextDataBackup()">💾 Бэкап</button>
+            <button class="btn btn-danger" onclick="clearAllData()">🗑 Сброс</button>
+        </div>
+    </div>
+
+    <div class="nav-tabs" id="tabs-container"></div>
+    <div id="apartments-container"></div>
+
+    <script>
+        const apts = {
+            "41": { addr: "ул. Вице-адмирала Падорина, д. 29, пом. 41, эт. 2 (Инв. № 252)", h: "2.70 м", rooms: [
+                {id:"liv", name:"Комната (жилая)", p:"17.54", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"8.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"9.10", f:"линолеум"},
+                {id:"bath", name:"Ванная", p:"6.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ], checklist: [
+                "А.1 Сверить планировку с экспликацией (самовольные перепланировки)",
+                "А.2 Фиксация: фото каждого помещения, показания счетчиков",
+                "А.3 Тип плиты: электрическая или газовая — записать",
+                "А.4 Счетчик электроэнергии: внутри квартиры или на площадке",
+                "Б.5 Комната (жилая): длина × ширина, периметр, площадь (план 17.54)",
+                "Б.6 Прихожая: ПЕРИМЕТР РАСЧЕТНЫЙ — замерить обязательно (план 8.00)*",
+                "Б.7 Кухня: длина × ширина, периметр, площадь (план 9.10)",
+                "Б.8 Ванная: ПЕРИМЕТР РАСЧЕТНЫЙ — замерить обязательно (план 6.50)*",
+                "Б.9 Туалет: ПЕРИМЕТР РАСЧЕТНЫЙ — замерить обязательно (план 4.20)*",
+                "Б.10 Высота помещений в каждой комнате (по экспликации 2.7 м)",
+                "Б.11 Все проемы: окна (кол-во и размеры), двери, балконная дверь",
+                "В.12 Окна ПВХ: состояние, кол-во створок, подоконники",
+                "В.13 Двери межкомнатные: посчитать кол-во проемов",
+                "В.14 Входные двери: сколько (вторую под демонтаж)",
+                "В.15 Антресоли верхние: есть/нет (демонтаж по требованиям)",
+                "В.16 Кладовая: убедиться, что отсутствует (по экспликации нет)",
+                "В.17 Балкон 0.6 м2: площадь, остекление, разбитые стекла",
+                "Г.18 Радиаторы отопления: кол-во и тип — под замену на ROYAL",
+                "Г.19 Полотенцесушитель: тип, состояние (замена на нержавеющий)",
+                "Г.20 Трубы водоснабжения/канализации: материал, длины (ПП 20/50 мм)",
+                "Г.21 Счетчик воды: установлены? (2 шт по требованиям)",
+                "Г.22 Вентиляция: тяга в кухне, ванной, туалете (проверка листом бумаги)",
+                "Г.23 Электрощиток: автоматы, состояние (16Ах2 + 25Ах1)",
+                "Г.24 Трасса кабеля от щитка: по потолку или стене — длина",
+                "Г.25 Вытяжка на кухне: розетка двухместная у вытяжки",
+                "Д.26 Тип старого покрытия полов по помещениям (демонтаж всего)",
+                "Д.27 Состояние лаг/основания: перепады, скрип (под OSB-3 9 мм)",
+                "Д.28 Нагар, копоть на стенах (места протравки)*",
+                "Д.29 Плесень, следы протечек, состояние штукатурки",
+                "Е.30 Ванная: ванна (размер), смесители, плитка до потолка, розетка",
+                "Е.31 Туалет: унитаз, стена под жалюзи 0.7х1.5 для доступа",
+                "Е.32 Точки стояков: где проходят трубы (для обвязки радиаторов)"
+            ]},
+            "29": { addr: "ул. Адмирала Сизова, д. 20, кв. 29, эт. 5 (Инв. № 278)", h: "2.70 м", rooms: [
+                {id:"liv1", name:"Комната 1 (жилая)", p:"14.30", f:"ламинат"},
+                {id:"liv2", name:"Комната 2 (жилая)", p:"11.10", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"8.00", f:"линолеум"},
+                {id:"cor", name:"Коридор", p:"1.80", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"9.42", f:"линолеум"},
+                {id:"pant", name:"Кладовая (2.4 м2)", p:"6.20", f:"—"},
+                {id:"bath", name:"Ванная", p:"6.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ], checklist: [
+                "А.1 Сверить планировку с экспликацией (графа 22)",
+                "А.2 Фиксация: фото каждого помещения, счетчики",
+                "А.3 Тип плиты: электрическая или газовая",
+                "А.4 Счетчик электроэнергии: внутри квартиры или на площадке",
+                "Б.5 Комната 1: длина х ширина, периметр (план 14.30)",
+                "Б.6 Комната 2: длина х ширина, периметр (план 11.10)",
+                "Б.7 Прихожая: замерить обязательно (план 8.00)*",
+                "Б.8 Кухня: длина х ширина, периметр (план 9.42)",
+                "Б.9 Коридор: замерить обязательно (план 1.80)*",
+                "Б.10 Ванная: замерить обязательно (план 6.50)*",
+                "Б.11 Туалет: замерить обязательно (план 4.20)*",
+                "Б.12 Высота помещений в каждой комнате (2.70 м)",
+                "Б.13 Все проемы: окна, двери, балконный блок",
+                "Б.14 Комната 1: по плану расхождение площади (15.72 против 14.3) — перепроверить*",
+                "В.15 Окна ПВХ: состояние, подоконники, откосы",
+                "В.16 Двери межкомнатные: кол-во проемов",
+                "В.17 Входные двери: основная + вторая под демонтаж",
+                "В.18 Антресоли верхние: демонтаж по требованиям",
+                "В.19 Кладовая 2.4 м2: состояние, дверь, замер стен под окраску",
+                "В.20 Балкон 0.6 м2: площадь, остекление, разбит ли",
+                "Г.21 Радиаторы отопления: под замену на ROYAL биметалл",
+                "Г.22 Полотенцесушитель: замена на нержавеющий",
+                "Г.23 Трубы водоснабжения/канализации: ПП 20/50 мм",
+                "Г.24 Счетчики воды: установлены? (2 шт)",
+                "Г.25 Вентиляция: тяга в кухне и с/у",
+                "Г.26 Электрощиток: автоматы 16Ах2 + 25Ах1",
+                "Г.27 Трасса кабеля от щитка: замерить длину",
+                "Г.28 Вытяжка на кухне: розетка двухместная у вытяжки",
+                "Д.29 Тип старого покрытия полов по помещениям (демонтаж)",
+                "Д.30 Состояние лаг/основания (выравнивание, OSB-3 9мм)",
+                "Д.31 Нагар, копоть на стенах (места протравки)*",
+                "Д.32 Плесень, следы протечек, состояние штукатурки",
+                "Е.33 Ванная: ванна акриловая 1.7м, кафель до потолка",
+                "Е.34 Туалет: унитаз, ниша под жалюзи 0.7х1.5",
+                "Е.35 Точки стояков и прохода труб отопления"
+            ]},
+            "61": { addr: "ул. Чабаненко, д. 5, кв. 61, эт. 7 (Инв. № 1199)", h: "2.70 м", rooms: [
+                {id:"liv", name:"Комната (жилая)", p:"16.70", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"5.80", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"8.06", f:"линолеум"},
+                {id:"pant", name:"Кладовая (1.7 м2)", p:"5.20", f:"—"},
+                {id:"bath", name:"Ванная", p:"2.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон (3.2 м2)", p:"7.50", f:"—"}
+            ], checklist: [
+                "А.1 Сверить планировку с экспликацией БТИ",
+                "А.2 Фиксация фото каждого помещения и счетчиков",
+                "А.3 Тип плиты на кухне — записать",
+                "А.4 Счетчик электроэнергии: расположение",
+                "Б.5 Комната (жилая): замер (план 16.70)",
+                "Б.6 Прихожая: замерить обязательно (план 5.80)*",
+                "Б.7 Кухня: замер (план 8.06)",
+                "Б.8 Ванная: замерить обязательно (план 2.50)*",
+                "Б.9 Туалет: замерить обязательно (план 4.20)*",
+                "Б.10 Высота помещений (2.70 м)",
+                "Б.11 Все проемы: окна, двери, балкон",
+                "В.12 Окна ПВХ: состояние, откосы, отливы",
+                "В.13 Двери межкомнатные: кол-во",
+                "В.14 Входные двери: демонтаж второй двери",
+                "В.15 Антресоли верхние: наличие и демонтаж",
+                "В.16 Кладовая 1.7 м2: состояние стен и двери",
+                "В.17 Балкон 3.2 м2: площадь, остекление, покраска",
+                "Г.18 Радиаторы: ROYAL биметалл",
+                "Г.19 Полотенцесушитель: под замену",
+                "Г.20 Трубы ГВС/ХВС/Канализация: ПП",
+                "Г.21 Счетчики воды: наличие",
+                "Г.22 Вентиляция: тяга в вентканалах",
+                "Г.23 Электрощиток и автоматы",
+                "Г.24 Трасса кабеля: длина и штробление",
+                "Г.25 Вытяжка: розетка",
+                "Д.26 Тип старого покрытия полов",
+                "Д.27 Состояние лаг и плит перекрытия",
+                "Д.28 Нагар, копоть на стенах (места протравки)*",
+                "Д.29 Плесень, следы протечек",
+                "Е.30 Ванная: ванна, смесители, плитка",
+                "Е.31 Туалет: унитаз, доступ к арматуре",
+                "Е.32 Точки стояков отопления"
+            ]},
+            "108": { addr: "ул. Вице-адмирала Падорина, д. 33, кв. 108, эт. 5 (Инв. № 1135)", h: "2.70 м", rooms: [
+                {id:"liv", name:"Комната (жилая Г-обр.)", p:"17.00", f:"ламинат"},
+                {id:"hal", name:"Прихожая", p:"10.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"6.22", f:"линолеум"},
+                {id:"pant", name:"Кладовая (1.3 м2)", p:"4.80", f:"—"},
+                {id:"bath", name:"Ванная", p:"2.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ], checklist: [
+                "А.1 Сверить планировку с экспликацией",
+                "А.2 Фиксация фото и счетчиков",
+                "А.3 Тип плиты — записать",
+                "А.4 Счетчик электроэнергии: внутри или снаружи",
+                "Б.5 Комната (жилая): замерить Г-образный контур полностью (план 17.00)*",
+                "Б.6 Прихожая: замерить обязательно (план 10.00)*",
+                "Б.7 Кухня: замер периметра (план 6.22)",
+                "Б.8 Ванная: замерить обязательно (план 2.50)*",
+                "Б.9 Туалет: замерить обязательно (план 4.20)*",
+                "Б.10 Высота помещений (2.70 м)",
+                "Б.11 Все проемы: окна и двери",
+                "Б.12 Комната 22.5 м2: обмерить сложный контур (4.23х4.13 + скос)*",
+                "Б.13 Подсчитать количество окон в комнате (принято 1)",
+                "В.14 Окна ПВХ: состояние, подоконники",
+                "В.15 Двери межкомнатные: кол-во проемов",
+                "В.16 Входные двери: демонтаж лишней",
+                "В.17 Антресоли верхние: демонтаж",
+                "В.18 Кладовая 1.3 м2: состояние, дверь",
+                "В.19 Балкон 0.6 м2: площадь, остекление",
+                "Г.20 Радиаторы отопления: замена на ROYAL",
+                "Г.21 Полотенцесушитель: под замену",
+                "Г.22 Трубы ХВС/ГВС/Канализация: ПП",
+                "Г.23 Счетчики воды: установлены?",
+                "Г.24 Вентиляция: проверка тяги",
+                "Г.25 Электрощиток и автоматы",
+                "Г.26 Трасса кабеля от щитка",
+                "Г.27 Вытяжка на кухне: розетка",
+                "Д.28 Тип старого покрытия полов",
+                "Д.29 Состояние лаг/основания под OSB-3",
+                "Д.30 Нагар, копоть на стенах (места протравки)*",
+                "Д.31 Плесень, следы протечек",
+                "Е.32 Ванная: акриловая ванна, кафель",
+                "Е.33 Туалет: унитаз, ниша под жалюзи",
+                "Е.34 Точки стояков и труб"
+            ]},
+            "34": { addr: "ул. Адмирала Сизова, д. 11, кв. 34, эт. 9 (Инв. № 269)", h: "2.65 м", rooms: [
+                {id:"liv", name:"Комната (жилая скош. угол)", p:"15.20", f:"ламинат"},
+                {id:"cor", name:"Коридор (роль прихожей)", p:"8.00", f:"линолеум"},
+                {id:"kit", name:"Кухня", p:"5.80", f:"линолеум"},
+                {id:"bath", name:"Ванная", p:"6.50", f:"плитка"},
+                {id:"teil", name:"Туалет", p:"4.20", f:"плитка"},
+                {id:"balc", name:"Балкон", p:"0.60", f:"—"}
+            ], checklist: [
+                "А.1 Сверить планировку с экспликацией БТИ",
+                "А.2 Фиксация фото и счетчиков",
+                "А.3 Тип плиты: электро или газ",
+                "А.4 Счетчик электроэнергии: расположение",
+                "Б.5 Комната (жилая): со скошенным углом — замерить обязательно (план 15.20)*",
+                "Б.6 Коридор: замерить обязательно (план 8.00)*",
+                "Б.7 Кухня: замер периметра (план 5.80)",
+                "Б.8 Ванная: замерить обязательно (план 6.50)*",
+                "Б.9 Туалет: замерить обязательно (план 4.20)*",
+                "Б.10 Высота помещений (по экспликации 2.65 м)",
+                "Б.11 Все проемы: окна и двери (коридор 2.8 м проемов)",
+                "Б.12 Комната 18.3 м2: обмерить стороны (4.47 / 3.61 / 3.22)*",
+                "В.13 Окна ПВХ: состояние, подоконники",
+                "В.14 Двери межкомнатные: кол-во проемов",
+                "В.15 Входные двери: основная + вторая",
+                "В.16 Антресоли верхние: демонтаж",
+                "В.17 Кладовая: убедиться, что отсутствует",
+                "В.18 Балкон 0.6 м2: площадь, разбитые стекла",
+                "Г.19 Радиаторы отопления: замена на ROYAL",
+                "Г.20 Полотенцесушитель: под замену",
+                "Г.21 Трубы ХВС/ГВС/Канализация: ПП",
+                "Г.22 Счетчики воды: установлены?",
+                "Г.23 Вентиляция: проверка тяги",
+                "Г.24 Электрощиток и автоматы",
+                "Г.25 Трасса кабеля от щитка",
+                "Г.26 Вытяжка на кухне: розетка",
+                "Д.27 Тип старого покрытия полов",
+                "Д.28 Состояние лаг/основания под OSB",
+                "Д.29 Нагар, копоть на стенах (места протравки)*",
+                "Д.30 Плесень, следы протечек",
+                "Е.31 Ванная: ванна, смесители, кафель",
+                "Е.32 Туалет: унитаз, ниша под жалюзи",
+                "Е.33 Точки стояков отопления"
+            ]}
+        };
+
+        let db;
+        const dbReq = indexedDB.open("okv_stable_db_v16", 1);
+        dbReq.onupgradeneeded = e => {
+            e.target.result.createObjectStore("files", {keyPath: "key"});
+        };
+        dbReq.onsuccess = e => { db = e.target.result; renderApp(); };
+
+        function renderApp() {
+            const tabsContainer = document.getElementById("tabs-container");
+            const container = document.getElementById("apartments-container");
+            tabsContainer.innerHTML = "";
+            container.innerHTML = "";
+            
+            Object.keys(apts).forEach((num, index) => {
+                const data = apts[num];
+                const activeClass = index === 0 ? "active" : "";
+                
+                tabsContainer.innerHTML += `<button class="tab-btn ${activeClass}" id="tab-${num}" onclick="switchApt('${num}')">Кв. ${num}</button>`;
+                
+                let html = `<div class="apt-content ${activeClass}" id="content-${num}">
+                    <div class="card">
+                        <div style="font-weight:bold;font-size:16px;color:#007bff;margin-bottom:4px;">Квартира № ${num}</div>
+                        <div class="apt-info">📍 ${data.addr}<br>📏 Базовая высота потолков: ${data.h}</div>`;
+                
+                data.rooms.forEach(r => {
+                    html += `<div class="room-block">
+                        <div class="room-title">
+                            <span>🏠 ${r.name}</span>
+                            <span style="font-size:11px;color:#6c757d;">План: ${r.p} м</span>
+                        </div>
+                        <div class="grid-inputs">
+                            <div>
+                                <label>Фактический периметр (м)</label>
+                                <input type="number" step="0.01" id="f-${num}-${r.id}-p" placeholder="0.00" oninput="calculateDelta('${num}','${r.id}','${r.p}',this.value)">
+                                <span id="d-${num}-${r.id}-p" class="delta-indicator delta-zero">Δ: —</span>
+                            </div>
+                            <div>
+                                <label>Покрытие пола</label>
+                                <select id="f-${num}-${r.id}-floor" onchange="saveText(this.id, this.value)">
+                                    <option value="${r.f}">${r.f}</option>
+                                    <option value="ламинат">ламинат</option>
+                                    <option value="линолеум">линолеум</option>
+                                    <option value="плитка">плитка</option>
+                                    <option value="—">—</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="media-container">
+                            <div class="file-btn">
+                                📷 Добавить фото
+                                <input type="file" accept="image/*" multiple capture="environment" onchange="processPhotos(this, '${num}', '${r.id}')">
+                            </div>
+                            <div class="media-actions">
+                                <button class="btn btn-danger" style="padding:4px 8px;font-size:10px;" onclick="deleteSelectedPhotos('${num}','${r.id}')">🗑 Удалить выбранные</button>
+                            </div>
+                            <div class="media-box" id="box-${num}-${r.id}"></div>
+                        </div>
+                    </div>`;
+                });
+
+                html += `<div class="checklist-v15">
+                    <div class="checklist-header">
+                        <span>📋 ЧЕК-ЛИСТ ОСМОТРА И ДЕФЕКТОВКИ</span>
+                        <span id="progress-${num}" style="color:#856404;font-weight:bold;">Прогресс: 0%</span>
+                    </div>
+                    <div class="check-scroll-box">`;
+                
+                data.checklist.forEach((item, cIdx) => {
+                    const isMandatory = item.includes('*') ? 'mandatory' : '';
+                    html += `<div class="check-row ${isMandatory}">
+                        <div class="check-text">${item}</div>
+                        <select id="ch-${num}-${cIdx}" class="status-select" onchange="saveCheckStatus('${num}', this.id, this.value)">
+                            <option value="">-</option>
+                            <option value="ok" style="color:#28a745;">✓ Норма</option>
+                            <option value="fail" style="color:#dc3545;">✗ Дефект</option>
+                        </select>
+                    </div>`;
+                });
+
+                html += `</div>
+                    <textarea placeholder="Общие примечания технадзора, дефекты лаг, разводки..." id="notes-${num}" oninput="saveText(this.id, this.value)" style="margin-top:8px;height:50px;font-size:12px;resize:none;"></textarea>
+                </div></div></div>`;
+                
+                container.innerHTML += html;
+            });
+            
+            restoreTextFields();
+            loadBlobsPreviews();
+            updateAllProgressIndicators();
+        }
+
+        function switchApt(num) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.apt-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`tab-${num}`).classList.add('active');
+            document.getElementById(`content-${num}`).classList.add('active');
+        }
+
+        function saveText(id, val) { 
+            localStorage.setItem(id, val); 
+        }
+
+        function calculateDelta(num, roomId, planVal, factVal) {
+            saveText(`f-${num}-${roomId}-p`, factVal);
+            const indicator = document.getElementById(`d-${num}-${roomId}-p`);
+            if (!factVal || isNaN(factVal)) {
+                indicator.innerText = "Δ: —";
+                indicator.className = "delta-indicator delta-zero";
+                return;
+            }
+            const diff = (parseFloat(factVal) - parseFloat(planVal)).toFixed(2);
+            if (parseFloat(diff) === 0) {
+                indicator.innerText = `Δ: 0.00`;
+                indicator.className = "delta-indicator delta-zero";
+            } else if (parseFloat(diff) > 0) {
+                indicator.innerText = `Δ: +${diff}`;
+                indicator.className = "delta-indicator delta-plus";
+            } else {
+                indicator.innerText = `Δ: ${diff}`;
+                indicator.className = "delta-indicator delta-minus";
+            }
+        }
+
+        function saveCheckStatus(num, id, val) {
+            saveText(id, val);
+            updateProgress(num);
+        }
+
+        function updateProgress(num) {
+            const total = apts[num].checklist.length;
+            let checked = 0;
+            for(let i=0; i<total; i++) {
+                if(localStorage.getItem(`ch-${num}-${i}`)) checked++;
+            }
+            const pct = Math.round((checked / total) * 100);
+            document.getElementById(`progress-${num}`).innerText = `Прогресс: ${checked}/${total} (${pct}%)`;
+        }
+
+        function updateAllProgressIndicators() {
+            Object.keys(apts).forEach(num => updateProgress(num));
+        }
+
+        function restoreTextFields() {
+            document.querySelectorAll('input, select, textarea').forEach(el => {
+                const v = localStorage.getItem(el.id);
+                if (v !== null) {
+                    el.value = v;
+                    if (el.id.endsWith('-p') && !el.id.startsWith('ch-')) {
+                        const parts = el.id.split('-');
+                        const num = parts[1];
+                        const rId = parts[2];
+                        const planObj = apts[num].rooms.find(r => r.id === rId);
+                        if(planObj) calculateDelta(num, rId, planObj.p, v);
+                    }
+                }
+            });
+        }
+
+        function processPhotos(input, num, roomId) {
+            if(!input.files || input.files.length === 0) return;
+            const tx = db.transaction("files", "readwrite");
+            const store = tx.objectStore("files");
+            
+            Array.from(input.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        if(w > 1600) { h = Math.round((h * 1600) / w); w = 1600; }
+                        canvas.width = w; canvas.height = h;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        ctx.fillStyle = "rgba(255, 204, 0, 0.9)";
+                        ctx.font = "bold 26px sans-serif";
+                        const time = new Date().toLocaleString('ru-RU');
+                        ctx.fillText(`Кв.${num} · ${roomId} · ${time}`, 20, h - 25);
+                        
+                        canvas.toBlob(blob => {
+                            const key = `img-${num}-${roomId}-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+                            store.put({ key, data: blob });
+                        }, 'image/jpeg', 0.85);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            tx.oncomplete = () => { setTimeout(loadBlobsPreviews, 500); };
+        }
+
+        function loadBlobsPreviews() {
+            if(!db) return;
+            document.querySelectorAll('.media-box').forEach(box => box.innerHTML = "");
+            
+            db.transaction("files", "readonly").objectStore("files").openCursor().onsuccess = e => {
+                const cursor = e.target.result;
+                if(cursor) {
+                    const k = cursor.value.key;
+                    const parts = k.split('-');
+                    const num = parts[1];
+                    const roomId = parts[2];
+                    const targetBox = document.getElementById(`box-${num}-${roomId}`);
+                    if(targetBox) {
+                        const div = document.createElement('div');
+                        div.className = 'media-item';
+                        div.dataset.key = k;
+                        div.onclick = () => div.classList.toggle('selected');
+                        
+                        const img = document.createElement('img');
+                        img.className = 'media-preview';
+                        img.src = URL.createObjectURL(cursor.value.data);
+                        
+                        div.appendChild(img);
+                        targetBox.appendChild(div);
+                    }
+                    cursor.continue();
+                }
+            };
+        }
+
+        function deleteSelectedPhotos(num, roomId) {
+            const targetBox = document.getElementById(`box-${num}-${roomId}`);
+            const selected = targetBox.querySelectorAll('.media-item.selected');
+            if(selected.length === 0) { alert("Сначала выберите фотографии кликом!"); return; }
+            
+            const tx = db.transaction("files", "readwrite");
+            const store = tx.objectStore("files");
+            selected.forEach(div => store.delete(div.dataset.key));
+            tx.oncomplete = () => loadBlobsPreviews();
+        }
+
+        function exportTextDataBackup() {
+            try {
+                const backup = { version: "v15.6-text-only", date: new Date().toISOString(), payload: JSON.stringify(localStorage) };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `OKV_TEXT_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(link); link.click(); link.remove();
+            } catch (err) { alert("Ошибка бэкапа: " + err.message); }
+        }
+
+        function clearAllData() {
+            if(confirm("ВНИМАНИЕ: Все замеры, чеклисты и фотографии будут безвозвратно удалены! Очистить?")) {
+                localStorage.clear();
+                const tx = db.transaction("files", "readwrite");
+                tx.objectStore("files").clear();
+                tx.oncomplete = () => { alert("База данных успешно обнулена!"); location.reload(); };
+            }
+        }
+
+        // Высокотехнологичный экспорт в формат SpreadsheetML (Excel XML) с поддержкой листов и стилей отклонений
+        function exportToExcel() {
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom"/>
+   <Borders/>
+   <Font ss:FontName="Calibri" x:CharSet="204" x:Family="Swiss" ss:Size="11" ss:Color="#000000"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="Header">
+   <Font ss:FontName="Calibri" x:CharSet="204" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#007bff" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="Title">
+   <Font ss:FontName="Calibri" x:CharSet="204" ss:Size="14" ss:Bold="1"/>
+  </Style>
+  <Style ss:ID="DeltaPlus">
+   <Interior ss:Color="#C6EFCE" ss:Pattern="Solid"/>
+   <Font ss:Color="#006100"/>
+  </Style>
+  <Style ss:ID="DeltaMinus">
+   <Interior ss:Color="#FFC7CE" ss:Pattern="Solid"/>
+   <Font ss:Color="#9C0006"/>
+  </Style>
+ </Styles>`;
+
+            // Сначала соберем все ключи медиа, чтобы сопоставить фото с комнатами
+            let mediaKeys = [];
+            const req = db.transaction("files", "readonly").objectStore("files").getAllKeys();
+            req.onsuccess = () => {
+                mediaKeys = req.result;
+                generateExcelPayload(xml, mediaKeys);
+            };
+        }
+
+        function generateExcelPayload(xml, mediaKeys) {
+            Object.keys(apts).forEach(num => {
+                const data = apts[num];
+                xml += `<Worksheet ss:Name="Кв. ${num} замеры">
+   <Table ss:ExpandedColumnCount="7" ss:ExpandedRowCount="${data.rooms.length + 4}" x:FullColumns="1" x:FullRows="1">
+    <Column ss:Width="160"/>
+    <Column ss:Width="80"/>
+    <Column ss:Width="80"/>
+    <Column ss:Width="80"/>
+    <Column ss:Width="100"/>
+    <Column ss:Width="100"/>
+    <Column ss:Width="250"/>
+    <Row ss:Height="24">
+     <Cell ss:StyleID="Title"><Data ss:Type="String">Ведомость замеров квартиры № ${num}</Data></Cell>
+    </Row>
+    <Row><Cell><Data ss:Type="String">Адрес: ${data.addr}</Data></Cell></Row>
+    <Row/>
+    <Row ss:StyleID="Header">
+     <Cell><Data ss:Type="String">Помещение</Data></Cell>
+     <Cell><Data ss:Type="String">Параметр</Data></Cell>
+     <Cell><Data ss:Type="String">План БТИ</Data></Cell>
+     <Cell><Data ss:Type="String">Факт замера</Data></Cell>
+     <Cell><Data ss:Type="String">Дельта (Δ)</Data></Cell>
+     <Cell><Data ss:Type="String">Пол</Data></Cell>
+     <Cell><Data ss:Type="String">Имена фото/медиа</Data></Cell>
+    </Row>`;
+
+                data.rooms.forEach(r => {
+                    const factVal = localStorage.getItem(`f-${num}-${r.id}-p`) || "";
+                    const floorVal = localStorage.getItem(`f-${num}-${r.id}-floor`) || r.f;
+                    
+                    let deltaStr = "0.00";
+                    let styleId = "Default";
+                    if(factVal && !isNaN(factVal)) {
+                        let diff = (parseFloat(factVal) - parseFloat(r.p)).toFixed(2);
+                        if(parseFloat(diff) > 0) { deltaStr = `+${diff}`; styleId = "DeltaPlus"; }
+                        else if(parseFloat(diff) < 0) { deltaStr = `${diff}`; styleId = "DeltaMinus"; }
+                    } else { deltaStr = "—"; }
+
+                    let photos = [];
+                    mediaKeys.forEach(k => {
+                        if(k.startsWith(`img-${num}-${r.id}-`)) photos.push(`${k}.jpg`);
+                    });
+                    let photoStr = photos.length > 0 ? photos.join(", ") : "нет фото";
+
+                    xml += `<Row>
+     <Cell><Data ss:Type="String">${r.name}</Data></Cell>
+     <Cell><Data ss:Type="String">Периметр</Data></Cell>
+     <Cell><Data ss:Type="Number">${r.p}</Data></Cell>
+     <Cell><Data ss:Type="${factVal ? 'Number' : 'String'}">${factVal || '—'}</Data></Cell>
+     <Cell ss:StyleID="${styleId}"><Data ss:Type="String">${deltaStr}</Data></Cell>
+     <Cell><Data ss:Type="String">${floorVal}</Data></Cell>
+     <Cell><Data ss:Type="String">${photoStr}</Data></Cell>
+    </Row>`;
+                });
+                xml += `</Table></Worksheet>`;
+
+                // Лист детального чеклиста
+                xml += `<Worksheet ss:Name="Кв. ${num} чеклист">
+   <Table ss:ExpandedColumnCount="3" ss:ExpandedRowCount="${data.checklist.length + 3}" x:FullColumns="1" x:FullRows="1">
+    <Column ss:Width="350"/>
+    <Column ss:Width="100"/>
+    <Column ss:Width="300"/>
+    <Row><Cell ss:StyleID="Title"><Data ss:Type="String">Чек-лист контроля дефектов Кв. ${num}</Data></Cell></Row>
+    <Row/>
+    <Row ss:StyleID="Header">
+     <Cell><Data ss:Type="String">Пункт проверки</Data></Cell>
+     <Cell><Data ss:Type="String">Статус</Data></Cell>
+     <Cell><Data ss:Type="String">Полевые заметки</Data></Cell>
+    </Row>`;
+
+                data.checklist.forEach((item, cIdx) => {
+                    const status = localStorage.getItem(`ch-${num}-${cIdx}`) || "Не проверено";
+                    const statusText = status === "ok" ? "✓ Норма" : (status === "fail" ? "✗ Дефект" : "—");
+                    const notes = (cIdx === data.checklist.length - 1) ? (localStorage.getItem(`notes-${num}`) || "") : "";
+                    
+                    xml += `<Row>
+     <Cell><Data ss:Type="String">${item}</Data></Cell>
+     <Cell><Data ss:Type="String">${statusText}</Data></Cell>
+     <Cell><Data ss:Type="String">${notes}</Data></Cell>
+    </Row>`;
+                });
+                xml += `</Table></Worksheet>`;
+            });
+
+            xml += `</Workbook>`;
+            
+            const blob = new Blob([xml], {type: "application/vnd.ms-excel;charset=utf-8"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `ОТЧЕТ_ОСМОТРА_СЕВЕРОМОРСК_${new Date().toISOString().slice(0,10)}.xls`;
+            document.body.appendChild(link); link.click(); link.remove();
+        }
+    </script>
+</body>
+</html>
